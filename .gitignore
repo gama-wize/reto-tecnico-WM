@@ -11,6 +11,9 @@
 *.swo
 *~
 
+# Python virtual environment
+.venv/
+
 # Env / secrets
 .env
 .env.*
