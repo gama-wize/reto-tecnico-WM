@@ -25,3 +25,15 @@ calendar_clean:
 retail_daily_primary:
   type: pandas.ParquetDataset
   filepath: data/03_primary/retail_daily_primary.parquet
+
+retail_features:
+  type: pandas.ParquetDataset
+  filepath: data/04_feature/retail_features.parquet
+
+model_input_train:
+  type: pandas.ParquetDataset
+  filepath: data/05_model_input/model_input_train.parquet
+
+model_input_test:
+  type: pandas.ParquetDataset
+  filepath: data/05_model_input/model_input_test.parquet

@@ -41,3 +41,69 @@ schema:
     is_navidad_season: bool
     is_buen_fin: bool
     is_semana_santa: bool
+
+forecasting:
+  target_column: amount_total
+  date_column: date_dt
+  original_date_column: date
+  entity_columns:
+    - store_id
+    - category
+
+  train_start_date: "2023-01-01"
+  train_end_date: "2023-12-31"
+  test_start_date: "2024-01-01"
+  test_end_date: "2024-02-29"
+
+  lags:
+    - 7
+    - 14
+    - 28
+
+  rolling_windows:
+    - 7
+    - 28
+
+  rolling_statistics:
+    - mean
+    - std
+
+  target_alternative_columns:
+    - units_sold
+
+  safe_base_feature_columns:
+    - store_id
+    - category
+    - store_format
+    - region
+    - size_sqm
+    - num_checkouts
+    - opening_year
+    - socioeconomic_level
+    - has_pharmacy
+    - has_fuel_station
+    - day_of_week
+    - day_name
+    - week_of_year
+    - month
+    - year
+    - quarter
+    - season
+    - is_holiday
+    - holiday_name
+    - is_payday
+    - is_weekend
+    - is_navidad_season
+    - is_buen_fin
+    - is_semana_santa
+    - has_promotion
+
+  leakage_columns:
+    - amount_cash
+    - amount_card
+    - total_transactions
+    - cash_transactions
+    - card_transactions
+    - units_sold
+    - avg_ticket
+    - replenishment_signal
