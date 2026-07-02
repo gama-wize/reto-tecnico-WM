@@ -1,8 +1,6 @@
 transactions:
   type: pandas.CSVDataset
   filepath: data/01_raw/transactions.csv
-  load_args:
-    parse_dates: [date]
 
 stores:
   type: pandas.CSVDataset
@@ -11,5 +9,15 @@ stores:
 calendar:
   type: pandas.CSVDataset
   filepath: data/01_raw/calendar.csv
-  load_args:
-    parse_dates: [date]
+
+transactions_clean:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/transactions_clean.parquet
+
+stores_clean:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/stores_clean.parquet
+
+calendar_clean:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/calendar_clean.parquet

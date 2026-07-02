@@ -1,0 +1,43 @@
+schema:
+  transactions:
+    date: string
+    store_id: string
+    category: string
+    total_transactions: int64
+    cash_transactions: Int64
+    card_transactions: int64
+    amount_total: float64
+    amount_cash: Float64
+    amount_card: float64
+    units_sold: Float64
+    avg_ticket: Float64
+    has_promotion: int64
+    replenishment_signal: Float64
+
+  stores:
+    store_id: string
+    store_format: string
+    region: string
+    size_sqm: int64
+    num_checkouts: int64
+    opening_year: int64
+    socioeconomic_level: string
+    has_pharmacy: bool
+    has_fuel_station: bool
+
+  calendar:
+    date: string
+    day_of_week: int64
+    day_name: string
+    week_of_year: int64
+    month: int64
+    year: int64
+    quarter: int64
+    season: string
+    is_holiday: bool
+    holiday_name: string
+    is_payday: bool
+    is_weekend: bool
+    is_navidad_season: bool
+    is_buen_fin: bool
+    is_semana_santa: bool
