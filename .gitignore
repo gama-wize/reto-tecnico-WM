@@ -25,3 +25,6 @@ logs/
 
 # OS / misc
 Thumbs.db
+
+# Claude Code
+CLAUDE.md
