@@ -21,3 +21,7 @@ stores_clean:
 calendar_clean:
   type: pandas.ParquetDataset
   filepath: data/02_intermediate/calendar_clean.parquet
+
+retail_daily_primary:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/retail_daily_primary.parquet
