@@ -1,0 +1,171 @@
+schema:
+  transactions:
+    date: string
+    store_id: string
+    category: string
+    total_transactions: int64
+    cash_transactions: Int64
+    card_transactions: int64
+    amount_total: float64
+    amount_cash: Float64
+    amount_card: float64
+    units_sold: Float64
+    avg_ticket: Float64
+    has_promotion: int64
+    replenishment_signal: Float64
+
+  stores:
+    store_id: string
+    store_format: string
+    region: string
+    size_sqm: int64
+    num_checkouts: int64
+    opening_year: int64
+    socioeconomic_level: string
+    has_pharmacy: bool
+    has_fuel_station: bool
+
+  calendar:
+    date: string
+    day_of_week: int64
+    day_name: string
+    week_of_year: int64
+    month: int64
+    year: int64
+    quarter: int64
+    season: string
+    is_holiday: bool
+    holiday_name: string
+    is_payday: bool
+    is_weekend: bool
+    is_navidad_season: bool
+    is_buen_fin: bool
+    is_semana_santa: bool
+
+forecasting:
+  target_column: amount_total
+  date_column: date_dt
+  original_date_column: date
+  entity_columns:
+    - store_id
+    - category
+
+  train_start_date: "2023-01-01"
+  train_end_date: "2023-12-31"
+  test_start_date: "2024-01-01"
+  test_end_date: "2024-02-29"
+
+  lags:
+    - 7
+    - 14
+    - 28
+
+  rolling_windows:
+    - 7
+    - 28
+
+  rolling_statistics:
+    - mean
+    - std
+
+  target_alternative_columns:
+    - units_sold
+
+  safe_base_feature_columns:
+    - store_id
+    - category
+    - store_format
+    - region
+    - size_sqm
+    - num_checkouts
+    - opening_year
+    - socioeconomic_level
+    - has_pharmacy
+    - has_fuel_station
+    - day_of_week
+    - day_name
+    - week_of_year
+    - month
+    - year
+    - quarter
+    - season
+    - is_holiday
+    - holiday_name
+    - is_payday
+    - is_weekend
+    - is_navidad_season
+    - is_buen_fin
+    - is_semana_santa
+    - has_promotion
+
+  leakage_columns:
+    - amount_cash
+    - amount_card
+    - total_transactions
+    - cash_transactions
+    - card_transactions
+    - units_sold
+    - avg_ticket
+    - replenishment_signal
+
+modeling:
+  target_column: amount_total
+  date_column: date_dt
+  original_date_column: date
+  entity_columns:
+    - store_id
+    - category
+  id_columns:
+    - date
+    - date_dt
+    - store_id
+    - category
+  baseline_column: amount_total_lag_7
+  model_name: lightgbm
+  random_state: 42
+  evaluation:
+    train_period:
+      start: "2023-01-01"
+      end: "2023-12-31"
+    test_period:
+      start: "2024-01-01"
+      end: "2024-02-29"
+    validation_strategy: single_temporal_holdout
+    no_cross_validation_reason: "The available history covers approximately 14 months and includes unique annual retail events such as Buen Fin and Navidad. A walk-forward CV would produce folds with materially different seasonal/event distributions, so the project uses a single clean temporal holdout and conservative fixed hyperparameters."
+    metrics:
+      - mae
+      - rmse
+      - smape
+      - relative_mae
+  lightgbm_params:
+    n_estimators: 300
+    learning_rate: 0.05
+    num_leaves: 31
+    min_child_samples: 50
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+    num_threads: 1
+    objective: regression
+  categorical_columns:
+    - store_id
+    - category
+    - store_format
+    - region
+    - socioeconomic_level
+    - day_name
+    - season
+    - holiday_name
+  segment_columns:
+    - category
+    - store_format
+    - region
+    - is_weekend
+    - is_payday
+    - is_buen_fin
+    - is_navidad_season
+    - is_semana_santa
+  excluded_feature_columns:
+    - date
+    - date_dt
+    - amount_total

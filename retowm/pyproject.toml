@@ -1,0 +1,90 @@
+[build-system]
+requires = [
+    "setuptools",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+requires-python = ">=3.10"
+name = "retowm"
+readme = "README.md"
+dynamic = [
+    "version",
+]
+dependencies = [
+    "kedro>=1.5.0",
+    "kedro-datasets>=9.5.0",
+    "pandas>=2.2",
+    "numpy>=1.24",
+    "pyarrow>=12.0",
+    "lightgbm>=4.3.0",
+    "scikit-learn>=1.4.0",
+    "matplotlib>=3.8",
+    "PyYAML>=6.0",
+    "jupyterlab>=4.0",
+    "ipython>=8.10",
+    "nbconvert>=7.0",
+]
+
+[project.scripts]
+retowm = "retowm.__main__:main"
+
+[project.entry-points."kedro.hooks"]
+
+[project.optional-dependencies]
+dev = [
+    "ruff~=0.12.0",
+    "kedro-viz>=12.0",
+]
+
+[tool.setuptools.dynamic.version]
+attr = "retowm.__version__"
+
+[tool.setuptools.packages.find]
+where = [
+    "src",
+]
+namespaces = false
+
+[tool.kedro]
+package_name = "retowm"
+project_name = "retoWM"
+kedro_init_version = "1.5.0"
+tools = "['Linting', 'Testing', 'Data Structure']"
+example_pipeline = "False"
+source_dir = "src"
+
+[tool.pytest.ini_options]
+addopts = "--cov-report term-missing --cov src/retowm -ra"
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 88
+show-fixes = true
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "F",
+    "W",
+    "E",
+    "I",
+    "UP",
+    "PL",
+    "T201",
+]
+ignore = [
+    "E501",
+]
+
+[tool.kedro_telemetry]
+project_id = "20c84a8ebe914168937a34ca957320c6"
