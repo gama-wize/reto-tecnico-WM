@@ -8,7 +8,7 @@ _W = 60
 def _banner(message: str) -> None:
     line = "#" * _W
     padded = f"#   {message:<{_W - 5}}#"
-    print(f"\n{line}\n{padded}\n{line}\n", flush=True)
+    print(f"\n{line}\n{padded}\n{line}\n", flush=True)  # noqa: T201
 
 
 class PipelineLoggingHooks:

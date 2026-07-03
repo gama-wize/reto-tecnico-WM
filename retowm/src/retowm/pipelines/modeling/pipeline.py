@@ -1,6 +1,10 @@
 from kedro.pipeline import Pipeline, node, pipeline
 
-from .nodes import evaluate_segments, extract_feature_importance, train_and_evaluate_model
+from .nodes import (
+    evaluate_segments,
+    extract_feature_importance,
+    train_and_evaluate_model,
+)
 
 
 def create_pipeline(**kwargs) -> Pipeline:
