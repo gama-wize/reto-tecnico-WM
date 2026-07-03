@@ -52,7 +52,7 @@ def _regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     return {"mae": mae, "rmse": rmse, "smape": smape, "relative_mae": relative_mae}
 
 
-def train_and_evaluate_model(
+def train_and_evaluate_model(  # noqa: PLR0915
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
     parameters: dict,
