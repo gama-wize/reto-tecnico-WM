@@ -37,3 +37,27 @@ model_input_train:
 model_input_test:
   type: pandas.ParquetDataset
   filepath: data/05_model_input/model_input_test.parquet
+
+trained_model:
+  type: pickle.PickleDataset
+  filepath: data/06_models/lightgbm_model.pkl
+
+test_predictions:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/test_predictions.parquet
+
+model_comparison:
+  type: pandas.CSVDataset
+  filepath: data/08_reporting/model_comparison.csv
+  save_args:
+    index: false
+
+model_metrics:
+  type: json.JSONDataset
+  filepath: data/08_reporting/model_metrics.json
+
+segment_metrics:
+  type: pandas.CSVDataset
+  filepath: data/08_reporting/segment_metrics.csv
+  save_args:
+    index: false
