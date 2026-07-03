@@ -1,6 +1,6 @@
 from kedro.pipeline import Pipeline, node, pipeline
 
-from .nodes import evaluate_segments, train_and_evaluate_model
+from .nodes import evaluate_segments, extract_feature_importance, train_and_evaluate_model
 
 
 def create_pipeline(**kwargs) -> Pipeline:
@@ -24,6 +24,15 @@ def create_pipeline(**kwargs) -> Pipeline:
                 },
                 outputs="segment_metrics",
                 name="evaluate_segments",
+            ),
+            node(
+                func=extract_feature_importance,
+                inputs={
+                    "trained_model": "trained_model",
+                    "parameters": "parameters",
+                },
+                outputs="feature_importance",
+                name="extract_feature_importance",
             ),
         ]
     )

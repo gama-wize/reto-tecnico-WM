@@ -37,6 +37,15 @@ def build_retail_daily_primary(
             f"Row count changed after joins: expected {initial_rows}, got {len(primary)}."
         )
 
+    store_required = [c for c in stores_clean.columns if c != "store_id" and stores_clean[c].notna().all()]
+    cal_required = [c for c in calendar_clean.columns if c != "date" and calendar_clean[c].notna().all()]
+    null_store = int(primary[store_required].isna().any(axis=1).sum()) if store_required else 0
+    null_cal = int(primary[cal_required].isna().any(axis=1).sum()) if cal_required else 0
+    if null_store > 0:
+        raise ValueError(f"{null_store} rows have unmatched store_id after join with stores.")
+    if null_cal > 0:
+        raise ValueError(f"{null_cal} rows have unmatched date after join with calendar.")
+
     validate_unique_key(primary, PRIMARY_KEY, "retail_daily_primary")
 
     primary["date_dt"] = pd.to_datetime(primary["date"], format="%Y-%m-%d", errors="raise")

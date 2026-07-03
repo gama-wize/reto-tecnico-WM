@@ -36,10 +36,10 @@ def _validate_no_leakage_columns(
         )
 
 
-def _get_engineered_feature_columns(df: pd.DataFrame) -> list[str]:
+def _get_engineered_feature_columns(df: pd.DataFrame, target_column: str) -> list[str]:
     return [
         c for c in df.columns
-        if c.startswith("amount_total_lag_") or c.startswith("amount_total_rolling_")
+        if c.startswith(f"{target_column}_lag_") or c.startswith(f"{target_column}_rolling_")
     ]
 
 
@@ -68,8 +68,9 @@ def build_model_inputs(
     _validate_required_columns(retail_features, required, "retail_features")
 
     df = retail_features.copy()
+    _validate_no_leakage_columns(df, leakage_columns, target_column, "retail_features")
 
-    engineered_columns = _get_engineered_feature_columns(df)
+    engineered_columns = _get_engineered_feature_columns(df, target_column)
 
     safe_cols_present = [c for c in safe_base_feature_columns if c in df.columns]
     leakage_set = set(leakage_columns) - {target_column}
@@ -107,7 +108,6 @@ def build_model_inputs(
         raise ValueError("Temporal leakage: train max date >= test min date.")
 
     for split_name, split_df in [("model_input_train", train), ("model_input_test", test)]:
-        _validate_no_leakage_columns(split_df, leakage_columns, target_column, split_name)
         if target_column not in split_df.columns:
             raise ValueError(f"Target '{target_column}' missing from {split_name}.")
         missing_eng = [c for c in lag_and_rolling_cols if c not in split_df.columns]

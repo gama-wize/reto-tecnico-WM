@@ -61,3 +61,9 @@ segment_metrics:
   filepath: data/08_reporting/segment_metrics.csv
   save_args:
     index: false
+
+feature_importance:
+  type: pandas.CSVDataset
+  filepath: data/08_reporting/feature_importance.csv
+  save_args:
+    index: false

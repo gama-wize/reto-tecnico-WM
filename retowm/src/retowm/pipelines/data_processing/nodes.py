@@ -3,10 +3,13 @@ import pandas as pd
 
 def apply_schema(df: pd.DataFrame, schema: dict[str, str]) -> pd.DataFrame:
     df = df.copy()
-    missing = set(schema.keys()) - set(df.columns)
+    missing = sorted(set(schema.keys()) - set(df.columns))
     if missing:
         raise ValueError(f"Missing expected columns: {missing}")
-    return df.astype(schema)
+    extra = sorted(set(df.columns) - set(schema.keys()))
+    if extra:
+        raise ValueError(f"Unexpected columns not in schema: {extra}")
+    return df.astype(schema)[list(schema.keys())]
 
 
 def clean_transactions(transactions: pd.DataFrame, parameters: dict) -> pd.DataFrame:

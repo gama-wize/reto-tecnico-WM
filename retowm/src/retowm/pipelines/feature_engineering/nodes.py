@@ -81,6 +81,6 @@ def build_retail_features(
 
     return (
         df[final_columns]
-        .sort_values([date_column, "store_id", "category"])
+        .sort_values([date_column] + entity_columns)
         .reset_index(drop=True)
     )

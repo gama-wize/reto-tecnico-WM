@@ -16,11 +16,7 @@ def _to_numpy_compatible(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = df[col].to_numpy(dtype=object, na_value=None)
         elif hasattr(dtype, "numpy_dtype"):
             # All other pandas extension types (BooleanDtype, Int64Dtype, etc.)
-            np_dtype = dtype.numpy_dtype
-            if np_dtype == np.dtype("bool"):
-                df[col] = df[col].astype("float64")
-            else:
-                df[col] = df[col].astype("float64")
+            df[col] = df[col].astype("float64")
         elif df[col].dtype == np.dtype("bool"):
             # Plain numpy bool — cast to float so SimpleImputer handles it
             df[col] = df[col].astype("float64")
@@ -35,7 +31,15 @@ def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(100 * np.mean(contributions))
 
 
+def _baseline_model_name(baseline_column: str, target_column: str) -> str:
+    prefix = target_column + "_"
+    suffix = baseline_column[len(prefix):] if baseline_column.startswith(prefix) else baseline_column
+    return f"baseline_{suffix}"
+
+
 def _regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
     mae = float(np.mean(np.abs(y_pred - y_true)))
     rmse = float(np.sqrt(np.mean((y_pred - y_true) ** 2)))
     smape = _smape(y_true, y_pred)
@@ -111,21 +115,23 @@ def train_and_evaluate_model(
         remainder="drop",
     )
 
-    lgbm_kwargs = {k: v for k, v in lightgbm_params.items() if k != "objective"}
     model_pipeline = Pipeline([
         ("preprocessor", preprocessor),
-        ("regressor", LGBMRegressor(**lgbm_kwargs, objective="regression")),
+        ("regressor", LGBMRegressor(**lightgbm_params)),
     ])
+    model_pipeline.set_output(transform="pandas")
 
     model_pipeline.fit(X_train, y_train)
     lgbm_pred = model_pipeline.predict(X_test)
     baseline_pred = test_df[baseline_column].to_numpy()
 
+    bname = _baseline_model_name(baseline_column, target_column)
+
     baseline_metrics = _regression_metrics(y_test, baseline_pred)
     lgbm_metrics = _regression_metrics(y_test, lgbm_pred)
 
     model_comparison = pd.DataFrame([
-        {"model": "baseline_lag_7", **baseline_metrics},
+        {"model": bname, **baseline_metrics},
         {"model": "lightgbm", **lgbm_metrics},
     ]).sort_values("mae").reset_index(drop=True)
 
@@ -139,7 +145,7 @@ def train_and_evaluate_model(
         "test_period": evaluation["test_period"],
         "no_cross_validation_reason": evaluation["no_cross_validation_reason"],
         "metrics_by_model": {
-            "baseline_lag_7": baseline_metrics,
+            bname: baseline_metrics,
             "lightgbm": lgbm_metrics,
         },
         "best_model_by_mae": best_model,
@@ -157,11 +163,11 @@ def train_and_evaluate_model(
 
     test_predictions = test_df[id_cols_present + extra_cols].copy()
     test_predictions["y_true"] = y_test
-    test_predictions["baseline_lag_7_pred"] = baseline_pred
+    test_predictions[f"{bname}_pred"] = baseline_pred
     test_predictions["lightgbm_pred"] = lgbm_pred
-    test_predictions["baseline_lag_7_error"] = baseline_pred - y_test
+    test_predictions[f"{bname}_error"] = baseline_pred - y_test
     test_predictions["lightgbm_error"] = lgbm_pred - y_test
-    test_predictions["baseline_lag_7_abs_error"] = np.abs(baseline_pred - y_test)
+    test_predictions[f"{bname}_abs_error"] = np.abs(baseline_pred - y_test)
     test_predictions["lightgbm_abs_error"] = np.abs(lgbm_pred - y_test)
 
     return model_pipeline, test_predictions, model_comparison, model_metrics
@@ -171,14 +177,17 @@ def evaluate_segments(
     test_predictions: pd.DataFrame,
     parameters: dict,
 ) -> pd.DataFrame:
+    modeling_params = parameters["modeling"]
+    bname = _baseline_model_name(modeling_params["baseline_column"], modeling_params["target_column"])
+
     if "y_true" not in test_predictions.columns:
         raise ValueError("test_predictions is missing 'y_true'.")
-    if "baseline_lag_7_pred" not in test_predictions.columns:
-        raise ValueError("test_predictions is missing 'baseline_lag_7_pred'.")
+    if f"{bname}_pred" not in test_predictions.columns:
+        raise ValueError(f"test_predictions is missing '{bname}_pred'.")
     if "lightgbm_pred" not in test_predictions.columns:
         raise ValueError("test_predictions is missing 'lightgbm_pred'.")
 
-    segment_columns = parameters["modeling"]["segment_columns"]
+    segment_columns = modeling_params["segment_columns"]
     available = [c for c in segment_columns if c in test_predictions.columns]
 
     output_columns = ["segment_column", "segment_value", "model", "n_rows",
@@ -188,7 +197,7 @@ def evaluate_segments(
         return pd.DataFrame(columns=output_columns)
 
     models = {
-        "baseline_lag_7": "baseline_lag_7_pred",
+        bname: f"{bname}_pred",
         "lightgbm": "lightgbm_pred",
     }
 
@@ -211,3 +220,105 @@ def evaluate_segments(
 
     result = pd.DataFrame(rows, columns=output_columns)
     return result.sort_values(["segment_column", "segment_value", "model"]).reset_index(drop=True)
+
+
+def _map_original_feature(transformed_name: str, categorical_columns: list[str]) -> str:
+    if transformed_name.startswith("num__"):
+        return transformed_name[len("num__"):]
+    if transformed_name.startswith("cat__"):
+        remainder = transformed_name[len("cat__"):]
+        matches = [c for c in categorical_columns if remainder.startswith(c + "_")]
+        if matches:
+            return max(matches, key=len)
+        return remainder
+    return transformed_name
+
+
+def extract_feature_importance(
+    trained_model: Pipeline,
+    parameters: dict,
+) -> pd.DataFrame:
+    if not hasattr(trained_model, "named_steps"):
+        raise ValueError("trained_model does not have named_steps.")
+    if "preprocessor" not in trained_model.named_steps:
+        raise ValueError("trained_model is missing named_step 'preprocessor'.")
+    if "regressor" not in trained_model.named_steps:
+        raise ValueError("trained_model is missing named_step 'regressor'.")
+
+    preprocessor = trained_model.named_steps["preprocessor"]
+    regressor = trained_model.named_steps["regressor"]
+
+    if not hasattr(preprocessor, "get_feature_names_out"):
+        raise ValueError("preprocessor does not support get_feature_names_out().")
+    if not hasattr(regressor, "feature_importances_"):
+        raise ValueError("regressor does not expose feature_importances_.")
+    if not hasattr(regressor, "booster_"):
+        raise ValueError("regressor does not expose booster_.")
+
+    feature_names = list(preprocessor.get_feature_names_out())
+    split_importances = regressor.feature_importances_
+    gain_importances = regressor.booster_.feature_importance(importance_type="gain")
+
+    if len(feature_names) != len(split_importances):
+        raise ValueError(
+            f"Feature names ({len(feature_names)}) do not match split importances ({len(split_importances)})."
+        )
+    if len(feature_names) != len(gain_importances):
+        raise ValueError(
+            f"Feature names ({len(feature_names)}) do not match gain importances ({len(gain_importances)})."
+        )
+
+    categorical_columns = parameters["modeling"]["categorical_columns"]
+
+    original_features = [
+        _map_original_feature(name, categorical_columns) for name in feature_names
+    ]
+
+    output_columns = [
+        "importance_level", "feature", "original_feature",
+        "importance_type", "importance", "importance_pct", "rank",
+    ]
+
+    def _build_encoded_rows(imp_values: np.ndarray, imp_type: str) -> pd.DataFrame:
+        total = float(imp_values.sum())
+        rows = []
+        for name, orig, val in zip(feature_names, original_features, imp_values):
+            rows.append({
+                "importance_level": "encoded_feature",
+                "feature": name,
+                "original_feature": orig,
+                "importance_type": imp_type,
+                "importance": float(val),
+                "importance_pct": float(val / total) if total > 0 else 0.0,
+            })
+        df = pd.DataFrame(rows)
+        df["rank"] = df["importance"].rank(method="min", ascending=False).astype(int)
+        return df[output_columns]
+
+    def _build_original_rows(imp_values: np.ndarray, imp_type: str) -> pd.DataFrame:
+        tmp = pd.DataFrame({
+            "original_feature": original_features,
+            "importance": imp_values.astype(float),
+        })
+        agg = tmp.groupby("original_feature", sort=False)["importance"].sum().reset_index()
+        total = float(agg["importance"].sum())
+        agg["importance_pct"] = agg["importance"].apply(
+            lambda v: float(v / total) if total > 0 else 0.0
+        )
+        agg["rank"] = agg["importance"].rank(method="min", ascending=False).astype(int)
+        agg["importance_level"] = "original_feature"
+        agg["feature"] = agg["original_feature"]
+        agg["importance_type"] = imp_type
+        return agg[output_columns]
+
+    parts = [
+        _build_encoded_rows(split_importances, "split"),
+        _build_encoded_rows(gain_importances, "gain"),
+        _build_original_rows(split_importances, "split"),
+        _build_original_rows(gain_importances, "gain"),
+    ]
+
+    result = pd.concat(parts, ignore_index=True)[output_columns]
+    return result.sort_values(
+        ["importance_level", "importance_type", "rank", "feature"]
+    ).reset_index(drop=True)
