@@ -59,7 +59,7 @@ flowchart LR
 ## Stack
 
 - Python 3.13
-- Kedro 1.3.1
+- Kedro 1.5.0
 - LightGBM 4.x
 - scikit-learn 1.4+
 - pandas 2.2+, numpy, pyarrow
