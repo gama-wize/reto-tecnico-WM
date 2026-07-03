@@ -6,6 +6,7 @@ def _validate_required_columns(
     required_columns: list[str],
     dataset_name: str,
 ) -> None:
+    """Raise ValueError if any required column is missing from df."""
     missing = [c for c in required_columns if c not in df.columns]
     if missing:
         raise ValueError(
@@ -14,6 +15,7 @@ def _validate_required_columns(
 
 
 def _deduplicate_preserve_order(columns: list[str]) -> list[str]:
+    """Return list with duplicates removed while preserving original order."""
     seen = set()
     result = []
     for col in columns:
@@ -29,6 +31,7 @@ def _validate_no_leakage_columns(
     target_column: str,
     dataset_name: str,
 ) -> None:
+    """Raise ValueError if any leakage column (excluding target) is present in df."""
     forbidden = [c for c in leakage_columns if c in df.columns and c != target_column]
     if forbidden:
         raise ValueError(
@@ -37,6 +40,7 @@ def _validate_no_leakage_columns(
 
 
 def _get_engineered_feature_columns(df: pd.DataFrame, target_column: str) -> list[str]:
+    """Return all lag and rolling feature columns derived from the given target."""
     return [
         c for c in df.columns
         if c.startswith(f"{target_column}_lag_") or c.startswith(f"{target_column}_rolling_")
@@ -47,6 +51,23 @@ def build_model_inputs(
     retail_features: pd.DataFrame,
     parameters: dict,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split the feature dataset into temporal train and test sets, validating for leakage.
+
+    Selects the final feature columns, drops rows with nulls in lag/rolling features,
+    and validates that the train and test periods are strictly non-overlapping.
+
+    Args:
+        retail_features: Feature-engineered dataset from the feature_engineering pipeline.
+        parameters: Kedro parameters dict with forecasting config (train/test date bounds,
+            target_column, leakage_columns, safe_base_feature_columns, entity_columns, etc.).
+
+    Returns:
+        Tuple of (train_df, test_df), each sorted by date and entity columns.
+
+    Raises:
+        ValueError: On missing columns, leakage column presence, empty splits, or
+            temporal overlap between train and test.
+    """
     forecasting_params = parameters["forecasting"]
 
     target_column = forecasting_params["target_column"]

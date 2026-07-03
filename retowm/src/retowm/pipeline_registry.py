@@ -12,5 +12,6 @@ def register_pipelines() -> dict[str, Pipeline]:
         A mapping from pipeline names to ``Pipeline`` objects.
     """
     pipelines = find_pipelines(raise_errors=True)
-    pipelines["__default__"] = sum(pipelines.values())
-    return pipelines
+    tagged = {name: pipe.tag(name) for name, pipe in pipelines.items()}
+    tagged["__default__"] = sum(tagged.values())
+    return tagged

@@ -8,6 +8,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 def _to_numpy_compatible(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert pandas extension dtypes to numpy-compatible equivalents for sklearn."""
     df = df.copy()
     for col in df.columns:
         dtype = df[col].dtype
@@ -24,6 +25,7 @@ def _to_numpy_compatible(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute symmetric mean absolute percentage error (sMAPE) as a percentage."""
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
     denominator = np.abs(y_true) + np.abs(y_pred)
@@ -32,12 +34,14 @@ def _smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def _baseline_model_name(baseline_column: str, target_column: str) -> str:
+    """Derive the baseline model label from the baseline column name (e.g. ``'baseline_lag_7'``)."""
     prefix = target_column + "_"
     suffix = baseline_column[len(prefix):] if baseline_column.startswith(prefix) else baseline_column
     return f"baseline_{suffix}"
 
 
 def _regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
+    """Return dict with mae, rmse, smape, and relative_mae for a set of predictions."""
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
     mae = float(np.mean(np.abs(y_pred - y_true)))
@@ -53,6 +57,28 @@ def train_and_evaluate_model(
     test_df: pd.DataFrame,
     parameters: dict,
 ) -> tuple[Pipeline, pd.DataFrame, pd.DataFrame, dict]:
+    """Train a LightGBM pipeline with sklearn preprocessing and evaluate against a lag baseline.
+
+    Builds a ColumnTransformer with OneHotEncoder for categoricals and SimpleImputer for
+    numerics, fits LGBMRegressor on the train set, and produces predictions, metrics, and
+    a comparison table for both the model and the baseline.
+
+    Args:
+        train_df: Training split from the model_input pipeline.
+        test_df: Test split from the model_input pipeline. Must contain the baseline column.
+        parameters: Kedro parameters dict with modeling config (target_column, baseline_column,
+            categorical_columns, excluded_feature_columns, lightgbm_params, etc.).
+
+    Returns:
+        Tuple of:
+        - Trained sklearn Pipeline (preprocessor + LGBMRegressor).
+        - test_predictions DataFrame with y_true, model predictions, errors, and abs errors.
+        - model_comparison DataFrame with MAE, RMSE, sMAPE, relative_MAE per model.
+        - model_metrics dict with training metadata, hyperparameters, and metrics by model.
+
+    Raises:
+        ValueError: If required columns are missing, target contains nulls, or no features remain.
+    """
     modeling_params = parameters["modeling"]
 
     target_column = modeling_params["target_column"]
@@ -177,6 +203,25 @@ def evaluate_segments(
     test_predictions: pd.DataFrame,
     parameters: dict,
 ) -> pd.DataFrame:
+    """Compute MAE, RMSE, sMAPE, and relative MAE per model broken down by segment column.
+
+    Iterates over all segment columns defined in parameters and computes per-segment
+    metrics for both the baseline and LightGBM predictions.
+
+    Args:
+        test_predictions: Output of train_and_evaluate_model containing y_true,
+            baseline predictions, lightgbm predictions, and segment columns.
+        parameters: Kedro parameters dict with modeling config (segment_columns,
+            baseline_column, target_column).
+
+    Returns:
+        Long-format DataFrame with columns: segment_column, segment_value, model, n_rows,
+        mae, rmse, smape, relative_mae. Returns empty DataFrame if no segment columns
+        are available in test_predictions.
+
+    Raises:
+        ValueError: If y_true or prediction columns are missing from test_predictions.
+    """
     modeling_params = parameters["modeling"]
     bname = _baseline_model_name(modeling_params["baseline_column"], modeling_params["target_column"])
 
@@ -223,6 +268,7 @@ def evaluate_segments(
 
 
 def _map_original_feature(transformed_name: str, categorical_columns: list[str]) -> str:
+    """Map a ColumnTransformer-prefixed feature name back to its original source column."""
     if transformed_name.startswith("num__"):
         return transformed_name[len("num__"):]
     if transformed_name.startswith("cat__"):
@@ -238,6 +284,27 @@ def extract_feature_importance(
     trained_model: Pipeline,
     parameters: dict,
 ) -> pd.DataFrame:
+    """Extract split and gain feature importance for both encoded and original features.
+
+    Retrieves importances from the LightGBM booster (split and gain), maps encoded
+    feature names back to their original source columns, and aggregates importance
+    by original feature via sum. Returns all four combinations
+    (encoded/original × split/gain) in a single long-format DataFrame.
+
+    Args:
+        trained_model: Fitted sklearn Pipeline with named steps ``'preprocessor'``
+            (ColumnTransformer) and ``'regressor'`` (LGBMRegressor).
+        parameters: Kedro parameters dict with modeling config (categorical_columns).
+
+    Returns:
+        Long-format DataFrame with columns: importance_level, feature, original_feature,
+        importance_type, importance, importance_pct, rank. Sorted by importance_level,
+        importance_type, rank, and feature.
+
+    Raises:
+        ValueError: If the pipeline is missing expected named steps or if feature name
+            and importance array lengths do not match.
+    """
     if not hasattr(trained_model, "named_steps"):
         raise ValueError("trained_model does not have named_steps.")
     if "preprocessor" not in trained_model.named_steps:
@@ -280,6 +347,7 @@ def extract_feature_importance(
     ]
 
     def _build_encoded_rows(imp_values: np.ndarray, imp_type: str) -> pd.DataFrame:
+        """Build importance rows for encoded (post-transform) features."""
         total = float(imp_values.sum())
         rows = []
         for name, orig, val in zip(feature_names, original_features, imp_values):
@@ -296,6 +364,7 @@ def extract_feature_importance(
         return df[output_columns]
 
     def _build_original_rows(imp_values: np.ndarray, imp_type: str) -> pd.DataFrame:
+        """Build importance rows aggregated by original source feature."""
         tmp = pd.DataFrame({
             "original_feature": original_features,
             "importance": imp_values.astype(float),

@@ -6,6 +6,7 @@ def _validate_required_columns(
     required_columns: list[str],
     dataset_name: str,
 ) -> None:
+    """Raise ValueError if any required column is missing from df."""
     missing = [c for c in required_columns if c not in df.columns]
     if missing:
         raise ValueError(
@@ -14,6 +15,7 @@ def _validate_required_columns(
 
 
 def _deduplicate_preserve_order(columns: list[str]) -> list[str]:
+    """Return list with duplicates removed while preserving original order."""
     seen = set()
     result = []
     for col in columns:
@@ -27,6 +29,23 @@ def build_retail_features(
     retail_daily_primary: pd.DataFrame,
     parameters: dict,
 ) -> pd.DataFrame:
+    """Build lag and rolling mean/std features for the target variable, grouped by store-category.
+
+    Drops leakage columns defined in parameters before returning. All lag and rolling
+    computations use shift within each store-category group to avoid lookahead.
+
+    Args:
+        retail_daily_primary: Joined analytical dataset from the data_integration pipeline.
+        parameters: Kedro parameters dict with forecasting config (lags, rolling_windows,
+            rolling_statistics, leakage_columns, entity_columns, target_column, etc.).
+
+    Returns:
+        DataFrame with original columns plus lag and rolling feature columns, sorted by
+        date and entity columns, with leakage columns removed.
+
+    Raises:
+        ValueError: If required columns are missing from retail_daily_primary.
+    """
     forecasting_params = parameters["forecasting"]
 
     target_column = forecasting_params["target_column"]
